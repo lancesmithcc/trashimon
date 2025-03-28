@@ -1,0 +1,29 @@
+{
+  "tags": [
+    {
+      "keyword": "mcdonalds",
+      "color": "#FF0000",
+      "count": 0
+    },
+    {
+      "keyword": "beer cans",
+      "color": "#FFD700",
+      "count": 0
+    },
+    {
+      "keyword": "plastic bottles",
+      "color": "#00FF00",
+      "count": 0
+    },
+    {
+      "keyword": "cigarette butts",
+      "color": "#808080",
+      "count": 0
+    },
+    {
+      "keyword": "food wrappers",
+      "color": "#FFA500",
+      "count": 0
+    }
+  ]
+}
