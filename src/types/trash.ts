@@ -11,6 +11,7 @@ export interface KeywordColor {
   keyword: string;
   color: string;
   count?: number;
+  lastUsedAt?: string;
 }
 
 export interface TrashLocation {

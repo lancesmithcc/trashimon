@@ -13,13 +13,15 @@ CREATE TABLE IF NOT EXISTS trash_locations (
 CREATE TABLE IF NOT EXISTS keywords (
   keyword TEXT PRIMARY KEY,
   color TEXT NOT NULL,
-  count INTEGER NOT NULL DEFAULT 0
+  count INTEGER NOT NULL DEFAULT 0,
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Create indexes for faster queries
 CREATE INDEX IF NOT EXISTS idx_trash_locations_expires_at ON trash_locations(expires_at);
 CREATE INDEX IF NOT EXISTS idx_trash_locations_created_at ON trash_locations(created_at);
 CREATE INDEX IF NOT EXISTS idx_keywords_count ON keywords(count DESC);
+CREATE INDEX IF NOT EXISTS idx_keywords_last_used_at ON keywords(last_used_at);
 
 -- Add Row Level Security policies
 ALTER TABLE trash_locations ENABLE ROW LEVEL SECURITY;

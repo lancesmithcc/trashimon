@@ -10,6 +10,7 @@ interface TrashState {
   addKeyword: (keyword: string) => Promise<void>;
   getPopularTags: () => KeywordColor[];
   cleanupExpiredLocations: () => Promise<void>;
+  cleanupExpiredKeywords: () => Promise<void>;
 }
 
 const generateColor = () => {
@@ -71,7 +72,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           image_url: item.imageUrl
         });
 
-      // Update keyword counts
+      // Update keyword counts and last_used_at
+      const nowIso = new Date().toISOString();
       for (const keyword of item.keywords) {
         // Upsert - update if exists, insert if not
         await supabase
@@ -79,7 +81,8 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           .upsert({ 
             keyword,
             color: get().keywords.find(k => k.keyword === keyword)?.color || generateColor(),
-            count: (get().keywords.find(k => k.keyword === keyword)?.count || 0) + 1
+            count: (get().keywords.find(k => k.keyword === keyword)?.count || 0) + 1,
+            last_used_at: nowIso
           }, { 
             onConflict: 'keyword',
             ignoreDuplicates: false 
@@ -92,21 +95,23 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   addKeyword: async (keyword) => {
     try {
-      const newKeyword = { 
+      const nowIso = new Date().toISOString();
+      const newKeywordData = { 
         keyword, 
         color: generateColor(), 
-        count: 0 
+        count: 0,
+        last_used_at: nowIso
       };
 
-      // Update local state
+      // Update local state (add lastUsedAt)
       set((state) => ({
-        keywords: [...state.keywords, newKeyword]
+        keywords: [...state.keywords, { ...newKeywordData, lastUsedAt: nowIso } ]
       }));
 
       // Save to Supabase
       await supabase
         .from('keywords')
-        .insert(newKeyword);
+        .insert(newKeywordData);
     } catch (error) {
       console.error('Error adding keyword:', error);
     }
@@ -142,7 +147,41 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     } catch (error) {
       console.error('Error cleaning up locations:', error);
     }
-  }
+  },
+
+  cleanupExpiredKeywords: async () => {
+    try {
+      const oneWeekAgo = new Date(Date.now() - ONE_WEEK_MS).toISOString();
+      
+      // Delete expired items from Supabase
+      const { error } = await supabase
+        .from('keywords')
+        .delete()
+        .lt('last_used_at', oneWeekAgo);
+
+      if (error) {
+        console.error('Error cleaning up keywords:', error);
+      } else {
+        // Optionally: Fetch updated keywords and update local state
+        // This prevents showing deleted keywords until next full init
+        const { data: currentKeywords, error: fetchError } = await supabase
+          .from('keywords')
+          .select('*');
+        if (!fetchError && currentKeywords) {
+          set({ 
+            keywords: currentKeywords.map(k => ({ 
+              keyword: k.keyword, 
+              color: k.color, 
+              count: k.count, 
+              lastUsedAt: k.last_used_at 
+            })) 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error during keyword cleanup:', error);
+    }
+  },
 }));
 
 // Initialize data from Supabase
@@ -166,7 +205,12 @@ const initializeStore = async () => {
 
     // Update the store
     useTrashStore.setState({
-      keywords: keywordsData || [],
+      keywords: keywordsData?.map(k => ({
+        keyword: k.keyword,
+        color: k.color,
+        count: k.count,
+        lastUsedAt: k.last_used_at
+      })) || [],
       locations: locationsData?.map(location => ({
         id: location.id,
         latitude: location.latitude,
@@ -186,5 +230,7 @@ initializeStore();
 
 // Run cleanup every hour
 setInterval(() => {
-  useTrashStore.getState().cleanupExpiredLocations();
+  const store = useTrashStore.getState();
+  store.cleanupExpiredLocations();
+  store.cleanupExpiredKeywords();
 }, 60 * 60 * 1000);
