@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 import fs from 'fs';
 import path from 'path';
 
@@ -35,7 +36,31 @@ if (!fs.existsSync(dataDir)) {
 });
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      manifest: {
+        name: 'Trashimon',
+        short_name: 'Trashimon',
+        description: 'Clean Up This Stinkin\' Town',
+        theme_color: '#242f3e',
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: '/',
+        start_url: '/',
+        icons: [
+          {
+            src: 'src/components/assets/logo.png',
+            sizes: '96x96 128x128 192x192 256x256 384x384 512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ]
+      }
+    })
+  ],
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
