@@ -283,7 +283,7 @@ export default function Map() {
   return (
     <div className="relative w-full h-full">
       {/* Logo positioned top-left */}
-      <div className="absolute top-4 left-4 z-10 w-16 h-auto md:w-32">
+      <div className="absolute top-4 md:top-8 left-4 z-10 w-16 h-auto md:w-64">
         <Logo />
       </div>
 
