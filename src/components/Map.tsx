@@ -8,6 +8,7 @@ import Scoreboard from './Scoreboard';
 const mapContainerStyle = {
   width: '100%',
   height: '100vh',
+  className: 'map-container'
 };
 
 const center = {
@@ -127,9 +128,9 @@ function TagSuggestions({ onSelect, onClose }: TagSuggestionProps) {
   
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn z-50">
-      <div className="bg-gray-900 rounded-2xl p-6 max-w-md w-full shadow-2xl transform transition-all animate-slideUp border border-gray-800">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-green-400 font-lexend">Trash Tag</h2>
+      <div className="bg-gray-900 rounded-2xl p-4 md:p-6 w-full max-w-[90%] md:max-w-md shadow-2xl transform transition-all animate-slideUp border border-gray-800">
+        <div className="flex justify-between items-center mb-4 md:mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-green-400">Trash Tag</h2>
           <button 
             onClick={onClose}
             className="text-gray-400 hover:text-gray-200 transition-colors"
@@ -138,36 +139,36 @@ function TagSuggestions({ onSelect, onClose }: TagSuggestionProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
           <div className="relative">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Type to search or add new tag..."
-              className="w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 
-                       focus:outline-none focus:ring-2 focus:ring-green-500 font-lexend placeholder-gray-500"
+              className="w-full px-3 py-2 md:px-4 md:py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 
+                       focus:outline-none focus:ring-2 focus:ring-green-500 placeholder-gray-500 text-sm md:text-base"
               autoFocus
             />
           </div>
 
           {suggestions.length > 0 && (
-            <div className="mt-2 space-y-2">
+            <div className="mt-2 space-y-2 max-h-[30vh] overflow-y-auto">
               {suggestions.map(({ keyword, color, count }) => (
                 <button
                   key={keyword}
                   type="button"
                   onClick={() => onSelect(keyword)}
-                  className="w-full p-3 rounded-lg text-left transition-all hover:scale-102 
+                  className="w-full p-2 md:p-3 rounded-lg text-left transition-all hover:scale-102 
                            focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 
-                           hover:shadow-md font-lexend flex justify-between items-center bg-gray-800"
+                           hover:shadow-md flex justify-between items-center bg-gray-800 text-sm md:text-base"
                   style={{
                     borderLeft: `4px solid ${color}`,
                   }}
                 >
                   <span className="font-medium text-gray-200">{keyword}</span>
                   {count !== undefined && count > 0 && (
-                    <span className="text-sm text-gray-400">{count} uses</span>
+                    <span className="text-xs md:text-sm text-gray-400">{count} uses</span>
                   )}
                 </button>
               ))}
@@ -177,9 +178,9 @@ function TagSuggestions({ onSelect, onClose }: TagSuggestionProps) {
           <button
             type="submit"
             disabled={!inputValue.trim()}
-            className="w-full py-3 px-4 rounded-xl font-medium transition-all transform hover:scale-102
+            className="w-full py-2 px-3 md:py-3 md:px-4 rounded-xl font-medium transition-all transform hover:scale-102
                      bg-gradient-to-r from-blue-500 to-green-500 text-white shadow-lg hover:shadow-xl
-                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 text-sm md:text-base"
           >
             Add Tag
           </button>
@@ -299,37 +300,45 @@ export default function Map() {
         )}
       </GoogleMap>
 
-      {/* Logo positioned below map controls */}
-      <div className="absolute top-[120px] left-4 w-[10%] h-auto z-10">
-        <Logo />
-      </div>
-
-      {/* Scoreboard */}
-      <Scoreboard />
-
-      {/* Main Trash Button */}
-      <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2">
-        <button
-          onClick={() => setShowTagSuggestions(true)}
-          className="bg-gradient-to-r from-blue-500 to-green-500 text-white px-8 py-6 rounded-full 
-                   shadow-xl hover:shadow-green-500/20 hover:from-blue-600 hover:to-green-600
-                   transition-all transform hover:scale-105 animate-float font-lexend
-                   flex items-center gap-3"
-        >
-          <Trash2 size={32} className="animate-pulse-custom" />
-          <span className="font-bold text-xl tracking-wide">PICKUP TRASH</span>
-        </button>
-      </div>
-
-      {/* Center on User Button */}
-      <div className="absolute bottom-6 right-6">
-        <button
-          className="bg-indigo-500 text-white p-4 rounded-full shadow-lg hover:bg-indigo-600 
-                     transition-all transform hover:scale-105 font-lexend"
-          onClick={centerOnUser}
-        >
-          <Crosshair size={24} />
-        </button>
+      {/* Mobile UI Container - Takes left 50% on mobile, is transparent */}
+      <div className="absolute top-0 left-0 bottom-0 md:w-auto md:right-auto w-1/2 flex flex-col justify-between pointer-events-none p-3 gap-3">
+        {/* Top Section */}
+        <div className="pointer-events-auto w-full">
+          {/* Logo */}
+          <div className="mb-4 w-full h-auto max-w-[100px]">
+            <Logo />
+          </div>
+          
+          {/* Scoreboard */}
+          <div className="w-full">
+            <Scoreboard />
+          </div>
+        </div>
+        
+        {/* Bottom Section */}
+        <div className="pointer-events-auto flex flex-col gap-4 w-full">
+          {/* Main Trash Button */}
+          <button
+            onClick={() => setShowTagSuggestions(true)}
+            className="bg-gradient-to-r from-blue-500 to-green-500 text-white px-4 py-4 md:px-8 md:py-6 rounded-full 
+                     shadow-xl hover:shadow-green-500/20 hover:from-blue-600 hover:to-green-600
+                     transition-all transform hover:scale-105 animate-float
+                     flex items-center gap-2 justify-center w-full"
+          >
+            <Trash2 size={24} className="animate-pulse-custom" />
+            <span className="font-bold text-sm md:text-xl tracking-wide">PICKUP</span>
+          </button>
+          
+          {/* Center on User Button */}
+          <button
+            className="bg-indigo-500 text-white p-3 rounded-full shadow-lg hover:bg-indigo-600 
+                     transition-all transform hover:scale-105 w-full flex items-center justify-center gap-2"
+            onClick={centerOnUser}
+          >
+            <Crosshair size={20} />
+            <span className="font-bold text-sm">CENTER</span>
+          </button>
+        </div>
       </div>
 
       {/* Tag Suggestions Modal */}

@@ -89,8 +89,25 @@
 }
 
 @layer base {
+  html, body, #root {
+    @apply h-full w-full m-0 p-0 overflow-hidden;
+  }
+  
   body {
     @apply antialiased;
-    font-family: 'Lexend', sans-serif;
+    font-family: 'Anton', sans-serif;
+  }
+}
+
+@layer components {
+  /* Adjust Google Map controls positioning */
+  .gm-style .gm-style-cc,
+  .gm-style .gmnoprint {
+    @apply !right-0 md:!right-auto;
+  }
+  
+  /* Ensure map container takes full dimensions */
+  .map-container {
+    @apply h-full w-full;
   }
 }

@@ -24,6 +24,16 @@
       "keyword": "food wrappers",
       "color": "#FFA500",
       "count": 0
+    },
+    {
+      "keyword": "poo",
+      "color": "#D4A5A5",
+      "count": 1
+    },
+    {
+      "keyword": "tim hortons",
+      "color": "#D4A5A5",
+      "count": 0
     }
   ]
 }
