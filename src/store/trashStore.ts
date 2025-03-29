@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { TrashItem, KeywordColor, TrashLocation } from '../types/trash';
+import { supabase } from '../lib/supabaseClient';
 
 interface TrashState {
   trashItems: TrashItem[];
@@ -18,40 +19,6 @@ const generateColor = () => {
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-const saveToFile = async (filename: string, data: any) => {
-  try {
-    const response = await fetch('/.netlify/functions/save-data', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ filename, data }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Error saving data:', error);
-    throw error;
-  }
-};
-
-const loadFromFile = async (filename: string) => {
-  try {
-    const response = await fetch(`/.netlify/functions/get-data?filename=${filename}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Error loading data:', error);
-    throw error;
-  }
-};
-
 export const useTrashStore = create<TrashState>((set, get) => ({
   trashItems: [],
   locations: [],
@@ -59,6 +26,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   
   addTrashItem: async (item) => {
     try {
+      // First, update local state for immediate UI feedback
       set((state) => {
         const updatedKeywords = state.keywords.map(k => {
           if (item.keywords.includes(k.keyword)) {
@@ -79,21 +47,44 @@ export const useTrashStore = create<TrashState>((set, get) => ({
           expiresAt: expiresAt.toISOString(),
         };
 
-        const updatedLocations = [...state.locations, newLocation];
-        
         return {
           trashItems: [...state.trashItems, item],
-          locations: updatedLocations,
+          locations: [...state.locations, newLocation],
           keywords: updatedKeywords
         };
       });
 
-      // Save to Netlify Functions after state update
-      const { locations, keywords } = get();
-      await Promise.all([
-        saveToFile('locations.json', { locations }),
-        saveToFile('tags.json', { tags: keywords })
-      ]);
+      // Then save to Supabase
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + ONE_WEEK_MS);
+      
+      // Insert into trash_locations table
+      await supabase
+        .from('trash_locations')
+        .insert({
+          id: item.id,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          keywords: item.keywords,
+          created_at: now.toISOString(),
+          expires_at: expiresAt.toISOString(),
+          image_url: item.imageUrl
+        });
+
+      // Update keyword counts
+      for (const keyword of item.keywords) {
+        // Upsert - update if exists, insert if not
+        await supabase
+          .from('keywords')
+          .upsert({ 
+            keyword,
+            color: get().keywords.find(k => k.keyword === keyword)?.color || generateColor(),
+            count: (get().keywords.find(k => k.keyword === keyword)?.count || 0) + 1
+          }, { 
+            onConflict: 'keyword',
+            ignoreDuplicates: false 
+          });
+      }
     } catch (error) {
       console.error('Error adding trash item:', error);
     }
@@ -107,13 +98,15 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         count: 0 
       };
 
+      // Update local state
       set((state) => ({
         keywords: [...state.keywords, newKeyword]
       }));
 
-      // Save to Netlify Functions after state update
-      const { keywords } = get();
-      await saveToFile('tags.json', { tags: keywords });
+      // Save to Supabase
+      await supabase
+        .from('keywords')
+        .insert(newKeyword);
     } catch (error) {
       console.error('Error adding keyword:', error);
     }
@@ -126,6 +119,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   cleanupExpiredLocations: async () => {
     try {
+      // Update local state
       set((state) => {
         const now = new Date();
         const activeLocations = state.locations.filter(location => {
@@ -139,32 +133,55 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         };
       });
 
-      // Save to Netlify Functions after state update
-      const { locations } = get();
-      await saveToFile('locations.json', { locations });
+      // Delete expired items from Supabase
+      const now = new Date().toISOString();
+      await supabase
+        .from('trash_locations')
+        .delete()
+        .lt('expires_at', now);
     } catch (error) {
       console.error('Error cleaning up locations:', error);
     }
   }
 }));
 
-// Initialize data
+// Initialize data from Supabase
 const initializeStore = async () => {
   try {
-    const [tagsData, locationsData] = await Promise.all([
-      loadFromFile('tags.json'),
-      loadFromFile('locations.json')
-    ]);
+    // Fetch keywords
+    const { data: keywordsData, error: keywordsError } = await supabase
+      .from('keywords')
+      .select('*');
+    
+    if (keywordsError) throw keywordsError;
+    
+    // Fetch active locations
+    const now = new Date().toISOString();
+    const { data: locationsData, error: locationsError } = await supabase
+      .from('trash_locations')
+      .select('*')
+      .gte('expires_at', now);
+    
+    if (locationsError) throw locationsError;
 
+    // Update the store
     useTrashStore.setState({
-      keywords: tagsData.tags,
-      locations: locationsData.locations
+      keywords: keywordsData || [],
+      locations: locationsData?.map(location => ({
+        id: location.id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        keywords: location.keywords,
+        createdAt: location.created_at,
+        expiresAt: location.expires_at
+      })) || []
     });
   } catch (error) {
-    console.error('Error initializing store:', error);
+    console.error('Error initializing store from Supabase:', error);
   }
 };
 
+// Call initialization function
 initializeStore();
 
 // Run cleanup every hour
