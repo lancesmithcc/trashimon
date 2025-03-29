@@ -4,6 +4,8 @@ import { useTrashStore } from '../store/trashStore';
 import { Trash2, Crosshair, X } from 'lucide-react';
 import { Logo } from './Logo';
 import Scoreboard from './Scoreboard';
+import { AnimatedEmoji } from './AnimatedEmoji';
+import { v4 as uuidv4 } from 'uuid';
 
 const mapContainerStyle = {
   width: '100%',
@@ -45,7 +47,7 @@ const darkMapStyle = [
   {
     featureType: "road",
     elementType: "geometry",
-    stylers: [{ color: "#38414e" }]
+    stylers: [{ color: "#c1e364" }]
   },
   {
     featureType: "road",
@@ -60,7 +62,7 @@ const darkMapStyle = [
   {
     featureType: "road.highway",
     elementType: "geometry",
-    stylers: [{ color: "#746855" }]
+    stylers: [{ color: "#c1e364" }]
   },
   {
     featureType: "road.highway",
@@ -200,6 +202,32 @@ export default function Map() {
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
 
+  // State for emojis
+  const [activeEmojis, setActiveEmojis] = useState<Array<{ id: string; emoji: string; top: string; left: string }>>([]);
+  const availableEmojis = ['💩', '🤮'];
+
+  // Function to remove an emoji when its animation completes
+  const handleEmojiComplete = useCallback((idToRemove: string) => {
+    setActiveEmojis(prev => prev.filter(e => e.id !== idToRemove));
+  }, []);
+
+  // Effect to add emojis periodically
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (activeEmojis.length < 15) { // Limit the number of emojis on screen
+        const newEmoji = {
+          id: uuidv4(),
+          emoji: availableEmojis[Math.floor(Math.random() * availableEmojis.length)],
+          top: `${Math.random() * 90}%`, // Random top position (0-90% to avoid edges)
+          left: `${Math.random() * 90}%`, // Random left position (0-90%)
+        };
+        setActiveEmojis(prev => [...prev, newEmoji]);
+      }
+    }, 1500); // Add a new emoji every 1.5 seconds
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, [activeEmojis.length]); // Rerun if emoji count changes (e.g., after removal)
+
   useEffect(() => {
     cleanupExpiredLocations();
   }, []);
@@ -253,7 +281,24 @@ export default function Map() {
   if (!isLoaded) return <div>Loading maps</div>;
 
   return (
-    <div className="relative w-full h-screen bg-gray-900">
+    <div className="relative w-full h-full">
+      {/* Logo positioned top-left */}
+      <div className="absolute top-4 left-4 z-10 w-16 h-auto md:w-32">
+        <Logo />
+      </div>
+
+      {/* Animated Emojis */}
+      {activeEmojis.map(({ id, emoji, top, left }) => (
+        <AnimatedEmoji
+          key={id}
+          id={id}
+          emoji={emoji}
+          top={top}
+          left={left}
+          onComplete={handleEmojiComplete}
+        />
+      ))}
+
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         zoom={15}
@@ -300,46 +345,34 @@ export default function Map() {
         )}
       </GoogleMap>
 
-      {/* Mobile UI Container - Takes left 50% on mobile, is transparent */}
-      <div className="absolute top-0 left-0 bottom-0 md:w-auto md:right-auto w-1/2 flex flex-col justify-between pointer-events-none p-3 gap-3">
-        {/* Top Section */}
-        <div className="pointer-events-auto w-full">
-          {/* Logo */}
-          <div className="mb-4 w-full h-auto max-w-[100px]">
-            <Logo />
-          </div>
-          
-          {/* Scoreboard */}
-          <div className="w-full">
-            <Scoreboard />
-          </div>
-        </div>
-        
-        {/* Bottom Section */}
-        <div className="pointer-events-auto flex flex-col gap-4 w-full">
-          {/* Main Trash Button */}
+      {/* UI Buttons */}
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-3">
+        <button
+          onClick={() => setShowTagSuggestions(true)}
+          className="bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 
+                     text-white font-bold py-3 px-3 rounded-full shadow-lg 
+                     hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none"
+          aria-label="Add Trash"
+        >
+          <Trash2 size={24} />
+        </button>
+        {userLocation && (
           <button
-            onClick={() => setShowTagSuggestions(true)}
-            className="bg-gradient-to-r from-blue-500 to-green-500 text-white px-4 py-4 md:px-8 md:py-6 rounded-full 
-                     shadow-xl hover:shadow-green-500/20 hover:from-blue-600 hover:to-green-600
-                     transition-all transform hover:scale-105 animate-float
-                     flex items-center gap-2 justify-center w-full"
-          >
-            <Trash2 size={24} className="animate-pulse-custom" />
-            <span className="font-bold text-sm md:text-xl tracking-wide">PICKUP</span>
-          </button>
-          
-          {/* Center on User Button */}
-          <button
-            className="bg-indigo-500 text-white p-3 rounded-full shadow-lg hover:bg-indigo-600 
-                     transition-all transform hover:scale-105 w-full flex items-center justify-center gap-2"
             onClick={centerOnUser}
+            className="bg-white/80 backdrop-blur-sm hover:bg-white 
+                       text-gray-700 font-bold py-3 px-3 rounded-full shadow-lg 
+                       hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none"
+            aria-label="Center on Me"
           >
-            <Crosshair size={20} />
-            <span className="font-bold text-sm">CENTER</span>
+            <Crosshair size={24} />
           </button>
-        </div>
+        )}
       </div>
+
+      {/* Scoreboard */}
+       <div className="absolute top-4 right-4 z-10 w-64">
+         <Scoreboard />
+       </div>
 
       {/* Tag Suggestions Modal */}
       {showTagSuggestions && (
