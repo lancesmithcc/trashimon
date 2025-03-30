@@ -1,19 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Map from './components/Map';
-import TrashForm from './components/TrashForm';
+import { IntroScreen } from './components/IntroScreen';
 
 function App() {
-  const [showForm, setShowForm] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState({ lat: 0, lng: 0 });
+  const [showIntro, setShowIntro] = useState(true);
+  const [isExiting, setIsExiting] = useState(false);
+
+  const handleStart = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      setShowIntro(false);
+    }, 500);
+  };
 
   return (
-    <div className="relative">
+    <div className="relative w-full h-full">
       <Map />
-      {showForm && (
-        <TrashForm
-          onClose={() => setShowForm(false)}
-          location={selectedLocation}
-        />
+
+      {showIntro && (
+        <div className="absolute inset-0 z-50">
+          <IntroScreen onStart={handleStart} isExiting={isExiting} />
+        </div>
       )}
     </div>
   );

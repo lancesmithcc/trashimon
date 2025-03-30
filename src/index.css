@@ -68,6 +68,17 @@
   }
 }
 
+@keyframes fadeOutScale {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
@@ -86,6 +97,11 @@
 
 .animate-marker-pulse {
   animation: markerPulse 2s infinite;
+}
+
+.animate-fadeOutScale {
+  animation: fadeOutScale 0.5s ease-in-out forwards;
+  /* forwards keeps the final state (opacity: 0, scale: 0.95) */
 }
 
 @layer base {
