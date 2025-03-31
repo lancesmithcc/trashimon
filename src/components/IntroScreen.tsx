@@ -22,7 +22,7 @@ export function IntroScreen({ onStart, isExiting }: IntroScreenProps) {
           <li>Explore the map to find real-world trash locations.</li>
           <li>When you're near trash, tap the <span className="inline-block bg-green-500 rounded-full p-1 leading-none mx-1 text-xs">🗑️</span> button.</li>
           <li>Add descriptive tags (e.g., "plastic bottle", "fast food wrapper").</li>
-          <li>Your tagged location appears on the map for 1 week!</li>
+          <li>Your tagged location appears on the map for 1 week to show trash hotspots!!</li>
         </ul>
       </div>
 
@@ -33,7 +33,7 @@ export function IntroScreen({ onStart, isExiting }: IntroScreenProps) {
                    transition-all transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-900
                    text-lg md:text-xl tracking-wide"
       >
-        LET'S CLEAN UP THIS STINKIN' TOWN!
+        LET'S CLEAN UP THIS STANKIN' TOWN!
       </button>
     </div>
   );
