@@ -206,53 +206,13 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   },
 }));
 
-// Initialize data from Supabase
-const initializeStore = async () => {
-  try {
-    // Fetch keywords
-    const { data: keywordsData, error: keywordsError } = await supabase
-      .from('keywords')
-      .select('*');
-    
-    if (keywordsError) throw keywordsError;
-    
-    // Fetch active locations
-    const now = new Date().toISOString();
-    const { data: locationsData, error: locationsError } = await supabase
-      .from('trash_locations')
-      .select('*')
-      .gte('expires_at', now);
-    
-    if (locationsError) throw locationsError;
+// Call initialization function when the module loads
+// initializeStore(); // Temporarily comment out auto-initialization
 
-    // Update the store
-    useTrashStore.setState({
-      keywords: keywordsData?.map(k => ({
-        keyword: k.keyword,
-        color: k.color,
-        count: k.count,
-        lastUsedAt: k.last_used_at
-      })) || [],
-      locations: locationsData?.map(location => ({
-        id: location.id,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        keywords: location.keywords,
-        createdAt: location.created_at,
-        expiresAt: location.expires_at
-      })) || []
-    });
-  } catch (error) {
-    console.error('Error initializing store from Supabase:', error);
-  }
-};
-
-// Call initialization function
-initializeStore();
-
-// Run cleanup every hour
-setInterval(() => {
-  const store = useTrashStore.getState();
-  store.cleanupExpiredLocations();
-  store.cleanupExpiredKeywords();
-}, 60 * 60 * 1000);
+// Run cleanup periodically (e.g., every hour)
+// const cleanupInterval = setInterval(() => { // Temporarily comment out interval
+//   console.log("Running cleanup tasks...");
+//   const store = useTrashStore.getState();
+//   store.cleanupExpiredLocations();
+//   store.cleanupExpiredKeywords();
+// }, 60 * 60 * 1000); // 1 hour
