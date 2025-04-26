@@ -206,11 +206,16 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   },
 }));
 
+// --- Store Initialization ---
+const initializeStore = async () => {
+  // ... (initialization logic) ...
+};
+
 // Call initialization function when the module loads
-// initializeStore(); // Temporarily comment out auto-initialization
+initializeStore(); // Uncomment this line
 
 // Run cleanup periodically (e.g., every hour)
-// const cleanupInterval = setInterval(() => { // Temporarily comment out interval
+// const cleanupInterval = setInterval(() => { // Keep interval commented for now if preferred
 //   console.log("Running cleanup tasks...");
 //   const store = useTrashStore.getState();
 //   store.cleanupExpiredLocations();

@@ -280,9 +280,11 @@ export default function Map() {
   }, [userLocation]);
 
   const onMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    console.log('Map clicked. isAddingStankZone:', isAddingStankZone, 'LatLng:', e.latLng?.toString());
     if (isAddingStankZone && e.latLng) {
       const lat = e.latLng.lat();
       const lng = e.latLng.lng();
+      console.log('Calling addStankZone with:', { lat, lng });
       addStankZone(lat, lng, null); 
       setIsAddingStankZone(false); 
     } else if (!isAddingStankZone && e.latLng) {
