@@ -522,7 +522,7 @@ export default function Map() {
 interface StankZonePopupProps {
   zone: StankZone;
   onClose: () => void;
-  onSaveNotes: (zoneId: string, notes: string) => Promise<StankZone | null>;
+  onSaveNotes: (zoneId: string, notes: string) => Promise<void>;
   onDelete: (zoneId: string) => Promise<void>;
 }
 
