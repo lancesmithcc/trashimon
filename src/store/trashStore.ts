@@ -13,8 +13,8 @@ interface TrashState {
   cleanupExpiredLocations: () => Promise<void>;
   cleanupExpiredKeywords: () => Promise<void>;
   fetchStankZones: () => Promise<void>;
-  addStankZone: (latitude: number, longitude: number, notes: string | null) => Promise<StankZone | null>;
-  updateStankZoneNotes: (zoneId: string, notes: string) => Promise<StankZone | null>;
+  addStankZone: (latitude: number, longitude: number, notes: string | null) => Promise<void>;
+  updateStankZoneNotes: (zoneId: string, notes: string) => Promise<void>;
   deleteStankZone: (zoneId: string) => Promise<void>;
 }
 
@@ -193,8 +193,52 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     // Implementation of fetchStankZones
   },
 
-  addStankZone: async (latitude: number, longitude: number, notes: string | null) => {
-    // Implementation of addStankZone
+  addStankZone: async (latitude, longitude, notes) => {
+    console.log('[addStankZone] Action started:', { latitude, longitude, notes });
+    try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('[addStankZone] User check:', { user, userError });
+      if (userError || !user) {
+          console.error('[addStankZone] User must be logged in.');
+          return null;
+      }
+
+      const newZoneData = {
+        latitude,
+        longitude,
+        notes,
+        creator_id: user.id,
+      };
+      console.log('[addStankZone] Inserting data:', newZoneData);
+
+      const { data, error } = await supabase
+        .from('stank_zones')
+        .insert(newZoneData)
+        .select()
+        .single();
+
+      console.log('[addStankZone] Supabase response:', { data, error });
+
+      if (error) {
+          console.error("Supabase insert error (stank_zones):", error);
+          throw error;
+      }
+
+      if (data) {
+        console.log('[addStankZone] Updating state with new zone:', data);
+        set((state) => {
+          const newState = [data as StankZone, ...state.stankZones];
+          console.log('[addStankZone] New stankZones state:', newState);
+          return { stankZones: newState };
+        });
+        return data as StankZone;
+      }
+      console.warn("[addStankZone] Insert succeeded but no data returned.");
+      return null;
+    } catch (error) {
+      console.error('[addStankZone] Error caught:', error);
+      return null;
+    }
   },
 
   updateStankZoneNotes: async (zoneId: string, notes: string) => {
