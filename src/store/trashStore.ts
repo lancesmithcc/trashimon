@@ -1,16 +1,21 @@
 import { create } from 'zustand';
-import { TrashItem, KeywordColor, TrashLocation } from '../types/trash';
+import { TrashItem, KeywordColor, TrashLocation, StankZone } from '../types/trash';
 import { supabase } from '../lib/supabaseClient';
 
 interface TrashState {
   trashItems: TrashItem[];
   locations: TrashLocation[];
   keywords: KeywordColor[];
+  stankZones: StankZone[];
   addTrashItem: (item: TrashItem) => Promise<void>;
   addKeyword: (keyword: string) => Promise<void>;
   getPopularTags: () => KeywordColor[];
   cleanupExpiredLocations: () => Promise<void>;
   cleanupExpiredKeywords: () => Promise<void>;
+  fetchStankZones: () => Promise<void>;
+  addStankZone: (latitude: number, longitude: number, notes: string | null) => Promise<StankZone | null>;
+  updateStankZoneNotes: (zoneId: string, notes: string) => Promise<StankZone | null>;
+  deleteStankZone: (zoneId: string) => Promise<void>;
 }
 
 const generateColor = () => {
@@ -24,6 +29,7 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   trashItems: [],
   locations: [],
   keywords: [],
+  stankZones: [],
   
   addTrashItem: async (item) => {
     try {
@@ -181,6 +187,22 @@ export const useTrashStore = create<TrashState>((set, get) => ({
     } catch (error) {
       console.error('Error during keyword cleanup:', error);
     }
+  },
+
+  fetchStankZones: async () => {
+    // Implementation of fetchStankZones
+  },
+
+  addStankZone: async (latitude: number, longitude: number, notes: string | null) => {
+    // Implementation of addStankZone
+  },
+
+  updateStankZoneNotes: async (zoneId: string, notes: string) => {
+    // Implementation of updateStankZoneNotes
+  },
+
+  deleteStankZone: async (zoneId: string) => {
+    // Implementation of deleteStankZone
   },
 }));
 
