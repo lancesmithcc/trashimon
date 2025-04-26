@@ -1,7 +1,8 @@
-import { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
 import { useTrashStore } from '../store/trashStore';
-import { Trash2, Crosshair, X } from 'lucide-react';
+import { StankZone } from '../types/trash';
+import { Trash2, Crosshair, X, LocateFixed } from 'lucide-react';
 import { Logo } from './Logo';
 import Scoreboard from './Scoreboard';
 import { AnimatedEmoji } from './AnimatedEmoji';
@@ -195,42 +196,55 @@ function TagSuggestions({ onSelect, onClose }: TagSuggestionProps) {
 export default function Map() {
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: ['geometry'],
   });
 
-  const { locations, addTrashItem, cleanupExpiredLocations } = useTrashStore();
+  const { 
+    locations, 
+    addTrashItem, 
+    cleanupExpiredLocations,
+    stankZones,
+    fetchStankZones,
+    addStankZone,
+    updateStankZoneNotes,
+    deleteStankZone,
+  } = useTrashStore();
+
+  const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
   const [location, setLocation] = useState(center);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [isAddingStankZone, setIsAddingStankZone] = useState(false);
+  const [selectedStankZone, setSelectedStankZone] = useState<StankZone | null>(null);
+  const [trashClickLocation, setTrashClickLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // State for emojis
   const [activeEmojis, setActiveEmojis] = useState<Array<{ id: string; emoji: string; top: string; left: string }>>([]);
   const availableEmojis = ['💩', '🤮'];
 
-  // Function to remove an emoji when its animation completes
   const handleEmojiComplete = useCallback((idToRemove: string) => {
     setActiveEmojis(prev => prev.filter(e => e.id !== idToRemove));
   }, []);
 
-  // Effect to add emojis periodically
   useEffect(() => {
     const intervalId = setInterval(() => {
-      if (activeEmojis.length < 15) { // Limit the number of emojis on screen
+      if (activeEmojis.length < 15) {
         const newEmoji = {
           id: uuidv4(),
           emoji: availableEmojis[Math.floor(Math.random() * availableEmojis.length)],
-          top: `${Math.random() * 90}%`, // Random top position (0-90% to avoid edges)
-          left: `${Math.random() * 90}%`, // Random left position (0-90%)
+          top: `${Math.random() * 90}%`,
+          left: `${Math.random() * 90}%`,
         };
         setActiveEmojis(prev => [...prev, newEmoji]);
       }
-    }, 1500); // Add a new emoji every 1.5 seconds
+    }, 1500);
 
-    return () => clearInterval(intervalId); // Cleanup on unmount
-  }, [activeEmojis.length]); // Rerun if emoji count changes (e.g., after removal)
+    return () => clearInterval(intervalId);
+  }, [activeEmojis.length]);
 
   useEffect(() => {
     cleanupExpiredLocations();
-  }, []);
+    fetchStankZones();
+  }, [cleanupExpiredLocations, fetchStankZones]);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -257,37 +271,102 @@ export default function Map() {
     }
   }, []);
 
-  const handleTagSelect = (tag: string) => {
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    setMapRef(map);
     if (userLocation) {
-      addTrashItem({
-        id: Date.now().toString(),
-        latitude: userLocation.lat,
-        longitude: userLocation.lng,
-        imageUrl: '',
-        keywords: [tag],
-        timestamp: new Date(),
-      });
+        // Don't pan automatically on load, let user control
+        // map.panTo(userLocation); 
+    }
+  }, [userLocation]);
+
+  const onMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (isAddingStankZone && e.latLng) {
+      const lat = e.latLng.lat();
+      const lng = e.latLng.lng();
+      addStankZone(lat, lng, null); 
+      setIsAddingStankZone(false); 
+    } else if (!isAddingStankZone && e.latLng) {
+        const clickLat = e.latLng.lat();
+        const clickLng = e.latLng.lng();
+
+        const nearbyLocation = locations.find(loc => {
+            const distance = google.maps.geometry?.spherical.computeDistanceBetween(
+                new google.maps.LatLng(clickLat, clickLng),
+                new google.maps.LatLng(loc.latitude, loc.longitude)
+            );
+            return distance !== undefined && distance < LOCATION_THRESHOLD + 20; 
+        });
+        
+        const nearbyStankZone = stankZones.find(zone => {
+             const distance = google.maps.geometry?.spherical.computeDistanceBetween(
+                new google.maps.LatLng(clickLat, clickLng),
+                new google.maps.LatLng(zone.latitude, zone.longitude)
+            );
+            return distance !== undefined && distance < LOCATION_THRESHOLD + 20;
+        });
+
+        if (!nearbyLocation && !nearbyStankZone) {
+            setTrashClickLocation({ lat: clickLat, lng: clickLng });
+            setShowTagSuggestions(true); 
+        } else if (nearbyStankZone) {
+             handleStankZoneMarkerClick(nearbyStankZone);
+        } else {
+            console.log("Clicked near existing trash location:", nearbyLocation?.id);
+        }
+    }
+  }, [isAddingStankZone, addStankZone, locations, stankZones]);
+
+  const handleTagSelect = (tag: string) => {
+    if (trashClickLocation) { 
+      const newItem = { 
+          id: uuidv4(),
+          latitude: trashClickLocation.lat, 
+          longitude: trashClickLocation.lng, 
+          keywords: [tag],
+          imageUrl: '', 
+          timestamp: new Date(),
+      };
+      addTrashItem(newItem);
+      setTrashClickLocation(null);
+    } else {
+        console.warn("Tried to select tag without a click location stored.");
     }
     setShowTagSuggestions(false);
   };
 
   const centerOnUser = () => {
-    if (userLocation) {
-      setLocation(userLocation);
+    if (userLocation && mapRef) {
+      mapRef.panTo(userLocation);
+      mapRef.setZoom(15);
     }
+  };
+
+  const handleStankZoneMarkerClick = (zone: StankZone) => {
+    setSelectedStankZone(zone); 
+  };
+
+  const handleCloseStankZonePopup = () => {
+    setSelectedStankZone(null);
   };
 
   if (loadError) return <div>Error loading maps</div>;
   if (!isLoaded) return <div>Loading maps</div>;
 
+  const mapOptions = {
+    styles: darkMapStyle,
+    backgroundColor: '#242f3e',
+    disableDefaultUI: true,
+    zoomControl: true,
+    clickableIcons: false,
+    gestureHandling: 'greedy',
+  };
+
   return (
     <div className="relative w-full h-full">
-      {/* Logo positioned top-left */}
       <div className="absolute top-4 md:top-8 left-4 z-10 w-16 h-auto md:w-64">
         <Logo />
       </div>
 
-      {/* Animated Emojis */}
       {activeEmojis.map(({ id, emoji, top, left }) => (
         <AnimatedEmoji
           key={id}
@@ -303,10 +382,10 @@ export default function Map() {
         mapContainerStyle={mapContainerStyle}
         zoom={15}
         center={location}
-        options={{
-          styles: darkMapStyle,
-          backgroundColor: '#242f3e',
-        }}
+        options={mapOptions}
+        onLoad={onMapLoad}
+        onClick={onMapClick}
+        mapContainerClassName={isAddingStankZone ? 'cursor-crosshair' : ''}
       >
         {locations.map((item) => {
           const tagColor = useTrashStore.getState().keywords.find(k => k.keyword === item.keywords[0])?.color || '#FF0000';
@@ -343,12 +422,28 @@ export default function Map() {
             }}
           />
         )}
+        {stankZones.map((zone) => (
+          <Marker
+            key={zone.id}
+            position={{ lat: zone.latitude, lng: zone.longitude }}
+            icon={{ 
+              url: '/icons/stank.svg',
+              scaledSize: new google.maps.Size(35, 35)
+            }}
+            title={`Stank Zone (Click to view notes)`}
+            onClick={() => handleStankZoneMarkerClick(zone)}
+            zIndex={1}
+          />
+        ))}
       </GoogleMap>
 
-      {/* UI Buttons */}
       <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-3">
         <button
-          onClick={() => setShowTagSuggestions(true)}
+          onClick={() => {
+              setIsAddingStankZone(false);
+              setShowTagSuggestions(true); 
+              setTrashClickLocation(userLocation);
+          }}
           className="bg-gradient-to-r from-green-400 to-blue-500 hover:from-green-500 hover:to-blue-600 
                      text-white font-bold py-3 px-3 rounded-full shadow-lg 
                      hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none"
@@ -356,6 +451,24 @@ export default function Map() {
         >
           <Trash2 size={24} />
         </button>
+        
+         <button 
+            onClick={() => setIsAddingStankZone(true)} 
+            disabled={isAddingStankZone} 
+            className={`p-3 rounded-full shadow-lg transition-all transform hover:scale-105 focus:outline-none
+                       ${isAddingStankZone 
+                          ? 'bg-yellow-500/90 cursor-not-allowed animate-pulse ring-2 ring-yellow-300' 
+                          : 'bg-gray-800/80 hover:bg-gray-700/90 backdrop-blur-sm'}`}
+            aria-label="Add Stank Zone"
+            title="Add a Stank Zone (Click map)"
+         >
+            <img 
+                src="/icons/stank.svg" 
+                alt="Add Stank Zone" 
+                className={`w-6 h-6 ${isAddingStankZone ? 'opacity-60' : ''}`}
+            />
+         </button>
+
         {userLocation && (
           <button
             onClick={centerOnUser}
@@ -364,23 +477,142 @@ export default function Map() {
                        hover:shadow-xl transition-all transform hover:scale-105 focus:outline-none"
             aria-label="Center on Me"
           >
-            <Crosshair size={24} />
+            <LocateFixed size={24} />
           </button>
         )}
       </div>
 
-      {/* Scoreboard */}
        <div className="absolute top-4 right-4 z-10 w-64">
          <Scoreboard />
        </div>
 
-      {/* Tag Suggestions Modal */}
       {showTagSuggestions && (
         <TagSuggestions
           onSelect={handleTagSelect}
-          onClose={() => setShowTagSuggestions(false)}
+          onClose={() => {
+              setShowTagSuggestions(false);
+              setTrashClickLocation(null);
+          }}
         />
       )}
+      
+      {selectedStankZone && (
+        <StankZonePopup 
+          zone={selectedStankZone} 
+          onClose={handleCloseStankZonePopup}
+          onSaveNotes={updateStankZoneNotes}
+          onDelete={deleteStankZone}
+        />
+      )}
+
+      {isAddingStankZone && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-4 py-2 rounded-full shadow-lg z-10 flex items-center space-x-2 animate-fadeIn">
+            <span className='text-sm font-medium'>Click map to place Stank Zone</span>
+            <button onClick={() => setIsAddingStankZone(false)} className="text-white hover:text-gray-200">
+                <X size={18}/>
+            </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface StankZonePopupProps {
+  zone: StankZone;
+  onClose: () => void;
+  onSaveNotes: (zoneId: string, notes: string) => Promise<void>;
+  onDelete: (zoneId: string) => Promise<void>;
+}
+
+function StankZonePopup({ zone, onClose, onSaveNotes, onDelete }: StankZonePopupProps) {
+  const [notes, setNotes] = useState(zone.notes || '');
+  const [isEditing, setIsEditing] = useState(!zone.notes);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    await onSaveNotes(zone.id, notes);
+    setIsSaving(false);
+    setIsEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to mark this zone as clean?')) {
+      setIsDeleting(true);
+      await onDelete(zone.id);
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn z-50">
+      <div className="bg-gray-900 rounded-2xl p-4 md:p-6 w-full max-w-[90%] md:max-w-md shadow-2xl transform transition-all animate-slideUp border border-yellow-600 border-opacity-50">
+        <div className="flex justify-between items-center mb-4 md:mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-yellow-400 flex items-center">
+             <img src="/icons/stank.svg" alt="Stank Zone" className="w-6 h-6 mr-2 opacity-80"/> 
+             Stank Zone Details
+          </h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-200 transition-colors"
+            aria-label="Close popup"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+            {isEditing ? (
+                <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Add notes about this area..."
+                    className="w-full h-24 p-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-100 
+                             focus:outline-none focus:ring-2 focus:ring-yellow-500 placeholder-gray-500 text-sm"
+                    autoFocus
+                />
+            ) : (
+                <p className="text-gray-300 text-sm min-h-[3rem] max-h-[10rem] overflow-y-auto bg-gray-800/50 p-2 rounded"> 
+                    {notes || <span className="italic text-gray-500">No notes added yet.</span>}
+                </p>
+            )}
+
+            <div className="flex flex-col md:flex-row gap-3 pt-2">
+                {isEditing ? (
+                    <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex-1 py-2 px-4 rounded-xl font-medium transition-colors text-sm
+                                 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isSaving ? 'Saving...' : 'Save Notes'}
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => setIsEditing(true)}
+                        className="flex-1 py-2 px-4 rounded-xl font-medium transition-colors text-sm
+                                 bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                        {notes ? 'Edit Notes' : 'Add Notes'}
+                    </button>
+                )}
+
+                 <button
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="flex-1 py-2 px-4 rounded-xl font-medium transition-colors text-sm
+                             bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isDeleting ? 'Cleaning...' : 'Mark as Clean'}
+                </button>
+            </div>
+             <p className="text-xs text-gray-500 text-center mt-2">
+                Reported: {new Date(zone.created_at).toLocaleString()} 
+                {zone.created_at !== zone.updated_at && ` | Updated: ${new Date(zone.updated_at).toLocaleString()}`}
+             </p>
+        </div>
+      </div>
     </div>
   );
 }
