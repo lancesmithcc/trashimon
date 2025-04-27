@@ -215,9 +215,9 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   addStankZone: async (latitude, longitude, notes) => {
     console.log('[addStankZone] Action started:', { latitude, longitude, notes });
     
-    // --- Optimistic Update --- Start
-    const tempId = `temp-${uuidv4()}`; // Generate a temporary ID
+    const tempId = `temp-${uuidv4()}`; 
     const now = new Date().toISOString();
+    // Optimistic update: No creator_id needed locally if anonymous
     const tempZone: StankZone = {
       id: tempId,
       latitude,
@@ -225,30 +225,29 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       notes,
       created_at: now,
       updated_at: now,
-      creator_id: null, // Will be filled later, or handle anonymous?
+      creator_id: null, // Keep null as we are anonymous
     };
 
-    // Update local state immediately
     set((state) => ({
       stankZones: [tempZone, ...state.stankZones]
     }));
-    // --- Optimistic Update --- End
 
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log('[addStankZone] User check:', { user, userError });
-      if (userError || !user) {
-        console.error('[addStankZone] User must be logged in. Reverting optimistic update.');
-        // Revert optimistic update if user not logged in
-        set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
-        return;
-      }
+      // REMOVED: User check
+      // const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // console.log('[addStankZone] User check:', { user, userError });
+      // if (userError || !user) {
+      //   console.error('[addStankZone] User must be logged in. Reverting optimistic update.');
+      //   set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
+      //   return;
+      // }
 
+      // Data to insert - remove creator_id
       const newZoneData = {
         latitude,
         longitude,
         notes,
-        creator_id: user.id,
+        // creator_id: user.id, // Removed
       };
       console.log('[addStankZone] Inserting data:', newZoneData);
 
@@ -262,14 +261,12 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
       if (error) {
         console.error("Supabase insert error (stank_zones):", error);
-        // Revert optimistic update on error
         set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
         throw error;
       }
 
       if (data) {
         console.log('[addStankZone] Replacing temp zone with real data:', data);
-        // Replace the temporary zone with the real one from Supabase
         set((state) => ({
           stankZones: state.stankZones.map(zone => 
             zone.id === tempId ? (data as StankZone) : zone
@@ -277,27 +274,26 @@ export const useTrashStore = create<TrashState>((set, get) => ({
         }));
       } else {
         console.warn("[addStankZone] Insert succeeded but no data returned. Reverting optimistic update.");
-         // Revert optimistic update if no data returned (unexpected)
         set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
       }
     } catch (error) {
       console.error('[addStankZone] Error caught:', error);
-      // Ensure revert happens even if error is thrown after Supabase call
       set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
     }
   },
 
   updateStankZoneNotes: async (zoneId, notes) => {
     try {
-       const { data: { user } } = await supabase.auth.getUser();
-       if (!user) {
-           console.error("User must be logged in to update notes.");
-           return;
-       }
+      // REMOVED: User check
+      //  const { data: { user } } = await supabase.auth.getUser();
+      //  if (!user) {
+      //      console.error("User must be logged in to update notes.");
+      //      return;
+      //  }
 
       const { data, error } = await supabase
         .from('stank_zones')
-        .update({ notes })
+        .update({ notes, updated_at: new Date().toISOString() }) // Also update updated_at
         .eq('id', zoneId)
         .select()
         .single();
@@ -313,8 +309,12 @@ export const useTrashStore = create<TrashState>((set, get) => ({
             zone.id === zoneId ? (data as StankZone) : zone
           ),
         }));
+      } else {
+       // Note: Supabase update might not return data by default unless specified
+       console.warn("Stank zone notes update succeeded but no data returned. Fetching updated zones...");
+       // Optionally fetch updated zones to refresh state if needed
+       get().fetchStankZones(); 
       }
-       console.warn("Stank zone update succeeded but no data returned.");
     } catch (error) {
       console.error('Error updating stank zone notes:', error);
     }
@@ -322,36 +322,43 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   deleteStankZone: async (zoneId: string) => {
     console.log('[deleteStankZone] Action started for zone ID:', zoneId);
-    try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      console.log('[deleteStankZone] User check:', { user, userError });
-      
-      if (userError || !user) {
-        console.error('[deleteStankZone] User must be logged in.');
-        return;
-      }
+    // Optimistic update: Remove immediately
+    set((state) => ({
+      stankZones: state.stankZones.filter((zone) => zone.id !== zoneId)
+    }));
 
-      // Delete the zone from Supabase, ensuring only the creator can delete their own zones
+    try {
+      // REMOVED: User check
+      // const { data: { user }, error: userError } = await supabase.auth.getUser();
+      // console.log('[deleteStankZone] User check:', { user, userError });
+      // 
+      // if (userError || !user) {
+      //   console.error('[deleteStankZone] User must be logged in.');
+      //   // Revert optimistic update if needed (though less critical for deletes)
+      //   // Potentially re-fetch zones: get().fetchStankZones();
+      //   return;
+      // }
+
+      // Delete the zone from Supabase - remove creator_id check
       const { error } = await supabase
         .from('stank_zones')
         .delete()
-        .eq('id', zoneId)
-        .eq('creator_id', user.id); // Security check: only delete if created by this user
+        .eq('id', zoneId);
+        // .eq('creator_id', user.id); // REMOVED: Security check: only delete if created by this user
 
       if (error) {
         console.error('[deleteStankZone] Supabase delete error:', error);
+        // Revert optimistic update on error by re-fetching all zones
+        get().fetchStankZones(); 
         throw error;
       }
 
-      // Update local state by removing the deleted zone
-      console.log('[deleteStankZone] Updating local state');
-      set((state) => ({
-        stankZones: state.stankZones.filter((zone) => zone.id !== zoneId)
-      }));
-      
-      console.log('[deleteStankZone] Zone successfully deleted');
+      // No need to update local state here, already done optimistically
+      console.log('[deleteStankZone] Zone successfully deleted from Supabase');
     } catch (error) {
       console.error('[deleteStankZone] Error caught:', error);
+      // Ensure state is consistent on error by re-fetching
+       get().fetchStankZones();
     }
   },
 }));

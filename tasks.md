@@ -26,7 +26,7 @@
 
 - [x] Fix stank zones not being saved by implementing proper data fetching
 - [x] Ensure stank zone markers appear on the map after adding them
-- [ ] Verify user authentication flow for stank zone operations
+- [x] Verify user authentication flow for stank zone operations
 
 ## Future Enhancements
 
