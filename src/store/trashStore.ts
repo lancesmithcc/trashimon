@@ -272,20 +272,22 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   },
 
   deleteStankZone: async (zoneId: string) => {
-    console.log('[deleteStankZone] Deleting stank zone:', zoneId);
+    console.log('[deleteStankZone] Action started for zone ID:', zoneId);
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
+      console.log('[deleteStankZone] User check:', { user, userError });
+      
       if (userError || !user) {
         console.error('[deleteStankZone] User must be logged in.');
         return;
       }
 
-      // Delete from Supabase
+      // Delete the zone from Supabase, ensuring only the creator can delete their own zones
       const { error } = await supabase
         .from('stank_zones')
         .delete()
         .eq('id', zoneId)
-        .eq('creator_id', user.id); // Ensure user can only delete their own zones
+        .eq('creator_id', user.id); // Security check: only delete if created by this user
 
       if (error) {
         console.error('[deleteStankZone] Supabase delete error:', error);
@@ -293,8 +295,9 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       }
 
       // Update local state by removing the deleted zone
+      console.log('[deleteStankZone] Updating local state');
       set((state) => ({
-        stankZones: state.stankZones.filter(zone => zone.id !== zoneId)
+        stankZones: state.stankZones.filter((zone) => zone.id !== zoneId)
       }));
       
       console.log('[deleteStankZone] Zone successfully deleted');
