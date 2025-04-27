@@ -23,6 +23,8 @@ export function IntroScreen({ onStart, isExiting }: IntroScreenProps) {
           <li>When you're near trash, tap the <span className="inline-block bg-green-500 rounded-full p-1 leading-none mx-1 text-xs">🗑️</span> button.</li>
           <li>Add descriptive tags (e.g., "plastic bottle", "fast food wrapper").</li>
           <li>Your tagged location appears on the map for 1 week to show trash hotspots!!</li>
+          <li>Spot a smelly area? Click the <img src="/icons/stank.svg" alt="Stank Zone" className="w-4 h-4 inline align-middle mx-1"/> button, then click the map to mark a Stank Zone.</li>
+          <li>Click a Stank Zone marker <img src="/icons/stank.svg" alt="Stank Zone Marker" className="w-4 h-4 inline align-middle mx-1"/> to add notes or mark it as cleaned.</li>
         </ul>
       </div>
 
