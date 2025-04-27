@@ -190,7 +190,25 @@ export const useTrashStore = create<TrashState>((set, get) => ({
   },
 
   fetchStankZones: async () => {
-    // Implementation of fetchStankZones
+    console.log('[fetchStankZones] Fetching stank zones');
+    try {
+      const { data, error } = await supabase
+        .from('stank_zones')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[fetchStankZones] Error fetching stank zones:', error);
+        return;
+      }
+
+      if (data) {
+        console.log('[fetchStankZones] Successfully fetched stank zones:', data.length);
+        set({ stankZones: data as StankZone[] });
+      }
+    } catch (error) {
+      console.error('[fetchStankZones] Error caught:', error);
+    }
   },
 
   addStankZone: async (latitude, longitude, notes) => {
@@ -309,7 +327,68 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
 // --- Store Initialization ---
 const initializeStore = async () => {
-  // ... (initialization logic) ...
+  console.log('Initializing trash store...');
+  try {
+    // Fetch trash locations
+    const { data: locations, error: locErr } = await supabase
+      .from('trash_locations')
+      .select('*');
+      
+    if (locErr) {
+      console.error('Error fetching trash locations:', locErr);
+    } else if (locations) {
+      useTrashStore.setState({ 
+        locations: locations.map(loc => ({
+          id: loc.id,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          keywords: loc.keywords,
+          createdAt: loc.created_at,
+          expiresAt: loc.expires_at,
+          imageUrl: loc.image_url
+        }))
+      });
+      console.log(`Loaded ${locations.length} trash locations`);
+    }
+
+    // Fetch keywords
+    const { data: keywords, error: keyErr } = await supabase
+      .from('keywords')
+      .select('*');
+      
+    if (keyErr) {
+      console.error('Error fetching keywords:', keyErr);
+    } else if (keywords) {
+      useTrashStore.setState({ 
+        keywords: keywords.map(k => ({
+          keyword: k.keyword,
+          color: k.color,
+          count: k.count,
+          lastUsedAt: k.last_used_at
+        }))
+      });
+      console.log(`Loaded ${keywords.length} keywords`);
+    }
+
+    // Fetch stank zones
+    const { data: stankZones, error: stankErr } = await supabase
+      .from('stank_zones')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (stankErr) {
+      console.error('Error fetching stank zones:', stankErr);
+    } else if (stankZones) {
+      useTrashStore.setState({ 
+        stankZones: stankZones as StankZone[]
+      });
+      console.log(`Loaded ${stankZones.length} stank zones`);
+    }
+
+    console.log('Trash store initialization complete');
+  } catch (error) {
+    console.error('Error initializing trash store:', error);
+  }
 };
 
 // Call initialization function when the module loads
