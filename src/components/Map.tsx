@@ -430,7 +430,7 @@ export default function Map() {
             position={{ lat: zone.latitude, lng: zone.longitude }}
             icon={{ 
               url: '/icons/stank.svg',
-              scaledSize: new google.maps.Size(35, 35)
+              scaledSize: new google.maps.Size(111, 111)
             }}
             title={`Stank Zone (Click to view notes)`}
             onClick={() => handleStankZoneMarkerClick(zone)}

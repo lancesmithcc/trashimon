@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { TrashItem, KeywordColor, TrashLocation, StankZone } from '../types/trash';
 import { supabase } from '../lib/supabaseClient';
+import { v4 as uuidv4 } from 'uuid';
 
 interface TrashState {
   trashItems: TrashItem[];
@@ -213,12 +214,34 @@ export const useTrashStore = create<TrashState>((set, get) => ({
 
   addStankZone: async (latitude, longitude, notes) => {
     console.log('[addStankZone] Action started:', { latitude, longitude, notes });
+    
+    // --- Optimistic Update --- Start
+    const tempId = `temp-${uuidv4()}`; // Generate a temporary ID
+    const now = new Date().toISOString();
+    const tempZone: StankZone = {
+      id: tempId,
+      latitude,
+      longitude,
+      notes,
+      created_at: now,
+      updated_at: now,
+      creator_id: null, // Will be filled later, or handle anonymous?
+    };
+
+    // Update local state immediately
+    set((state) => ({
+      stankZones: [tempZone, ...state.stankZones]
+    }));
+    // --- Optimistic Update --- End
+
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       console.log('[addStankZone] User check:', { user, userError });
       if (userError || !user) {
-          console.error('[addStankZone] User must be logged in.');
-          return;
+        console.error('[addStankZone] User must be logged in. Reverting optimistic update.');
+        // Revert optimistic update if user not logged in
+        set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
+        return;
       }
 
       const newZoneData = {
@@ -238,21 +261,29 @@ export const useTrashStore = create<TrashState>((set, get) => ({
       console.log('[addStankZone] Supabase response:', { data, error });
 
       if (error) {
-          console.error("Supabase insert error (stank_zones):", error);
-          throw error;
+        console.error("Supabase insert error (stank_zones):", error);
+        // Revert optimistic update on error
+        set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
+        throw error;
       }
 
       if (data) {
-        console.log('[addStankZone] Updating state with new zone:', data);
-        set((state) => {
-          const newState = [data as StankZone, ...state.stankZones];
-          console.log('[addStankZone] New stankZones state:', newState);
-          return { stankZones: newState };
-        });
+        console.log('[addStankZone] Replacing temp zone with real data:', data);
+        // Replace the temporary zone with the real one from Supabase
+        set((state) => ({
+          stankZones: state.stankZones.map(zone => 
+            zone.id === tempId ? (data as StankZone) : zone
+          )
+        }));
+      } else {
+        console.warn("[addStankZone] Insert succeeded but no data returned. Reverting optimistic update.");
+         // Revert optimistic update if no data returned (unexpected)
+        set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
       }
-      console.warn("[addStankZone] Insert succeeded but no data returned.");
     } catch (error) {
       console.error('[addStankZone] Error caught:', error);
+      // Ensure revert happens even if error is thrown after Supabase call
+      set((state) => ({ stankZones: state.stankZones.filter(z => z.id !== tempId) }));
     }
   },
 
@@ -392,7 +423,7 @@ const initializeStore = async () => {
 };
 
 // Call initialization function when the module loads
-initializeStore(); // Uncomment this line
+initializeStore();
 
 // Run cleanup periodically (e.g., every hour)
 // const cleanupInterval = setInterval(() => { // Keep interval commented for now if preferred
