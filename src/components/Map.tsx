@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { GoogleMap, useLoadScript, Marker } from '@react-google-maps/api';
 import { useTrashStore } from '../store/trashStore';
-import { StankZone } from '../types/trash';
+import { StankZone, TrashLocation } from '../types/trash';
 import { Trash2, Crosshair, X, LocateFixed } from 'lucide-react';
 import { Logo } from './Logo';
 import Scoreboard from './Scoreboard';
@@ -217,6 +217,7 @@ export default function Map() {
   const [isAddingStankZone, setIsAddingStankZone] = useState(false);
   const [selectedStankZone, setSelectedStankZone] = useState<StankZone | null>(null);
   const [trashClickLocation, setTrashClickLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedTrashItem, setSelectedTrashItem] = useState<TrashLocation | null>(null);
 
   const [activeEmojis, setActiveEmojis] = useState<Array<{ id: string; emoji: string; top: string; left: string }>>([]);
   const availableEmojis = ['💩', '🤮'];
@@ -248,7 +249,7 @@ export default function Map() {
 
   useEffect(() => {
     if ("geolocation" in navigator) {
-      const watchId = navigator.geolocation.watchPosition(
+      navigator.geolocation.getCurrentPosition(
         (position) => {
           const newLocation = {
             lat: position.coords.latitude,
@@ -262,12 +263,10 @@ export default function Map() {
         },
         {
           enableHighAccuracy: true,
-          timeout: 5000,
+          timeout: 10000,
           maximumAge: 0,
         }
       );
-
-      return () => navigator.geolocation.clearWatch(watchId);
     }
   }, []);
 
@@ -347,8 +346,16 @@ export default function Map() {
     setSelectedStankZone(zone); 
   };
 
+  const handleTrashMarkerClick = (item: TrashLocation) => {
+    setSelectedTrashItem(item);
+  };
+
   const handleCloseStankZonePopup = () => {
     setSelectedStankZone(null);
+  };
+
+  const handleCloseTrashInfoPopup = () => {
+    setSelectedTrashItem(null);
   };
 
   if (loadError) return <div>Error loading maps</div>;
@@ -408,6 +415,7 @@ export default function Map() {
                 strokeWeight: 2,
                 strokeColor: '#FFFFFF',
               }}
+              onClick={() => handleTrashMarkerClick(item)}
             />
           );
         })}
@@ -504,6 +512,13 @@ export default function Map() {
           onClose={handleCloseStankZonePopup}
           onSaveNotes={updateStankZoneNotes}
           onDelete={deleteStankZone}
+        />
+      )}
+
+      {selectedTrashItem && (
+        <TrashInfoPopup 
+          item={selectedTrashItem}
+          onClose={handleCloseTrashInfoPopup}
         />
       )}
 
@@ -613,6 +628,46 @@ function StankZonePopup({ zone, onClose, onSaveNotes, onDelete }: StankZonePopup
                 Reported: {new Date(zone.created_at).toLocaleString()} 
                 {zone.created_at !== zone.updated_at && ` | Updated: ${new Date(zone.updated_at).toLocaleString()}`}
              </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface TrashInfoPopupProps {
+  item: TrashLocation;
+  onClose: () => void;
+}
+
+function TrashInfoPopup({ item, onClose }: TrashInfoPopupProps) {
+  const keywordsString = item.keywords.join(', ');
+  const dateReported = new Date(item.createdAt).toLocaleDateString(
+    undefined,
+    { year: 'numeric', month: 'long', day: 'numeric' }
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn z-50">
+      <div className="bg-gray-900 rounded-2xl p-4 md:p-6 w-full max-w-[90%] md:max-w-md shadow-2xl transform transition-all animate-slideUp border border-gray-700">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-blue-400">Trash Details</h2>
+          <button 
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-200 transition-colors"
+            aria-label="Close popup"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm text-gray-500">Type:</p>
+            <p className="text-md text-gray-200 capitalize">{keywordsString}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Reported:</p>
+            <p className="text-md text-gray-200">{dateReported}</p>
+          </div>
         </div>
       </div>
     </div>

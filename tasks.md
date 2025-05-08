@@ -5,6 +5,7 @@
 - [ ] Implement stank zone calculation based on trash markers.
 - [ ] Persist stank zones across browser sessions.
 - [ ] Display stank zones on the map.
+- [x] Display trash type and date when a trash marker is clicked.
 
 ## Potential Enhancements
 - [ ] User accounts/authentication.
@@ -40,4 +41,6 @@
 
 - [ ] Add more comprehensive error handling for Supabase operations
 - [ ] Consider refactoring trashStore if it exceeds 500 lines
-- [ ] Add unit tests for stank zone operations 
+- [ ] Add unit tests for stank zone operations
+
+- [x] Disable automatic map recentering on mobile devices when a user tries to explore the map. 
